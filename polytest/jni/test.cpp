@@ -1,120 +1,69 @@
 #include <jni.h>
-#include <stdio.h>
-#include <vector>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc_c.h>
+#include <opencv2/features2d/features2d.hpp>
+#include <vector>
 
 using namespace std;
 using namespace cv;
 
-int N = 5;
-int thresh = 30;
+extern "C" {
+JNIEXPORT void JNICALL Java_com_example_polytest_ObjTrackView_ObTrack(JNIEnv* env, jobject thiz,
+    jint width, jint height, jbyteArray yuv, jintArray bgra, jboolean debug)
+{
+    jbyte* _yuv  = env->GetByteArrayElements(yuv, 0);
+    jint*  _bgra = env->GetIntArrayElements(bgra, 0);
 
-extern "C"{
-static double angle(Point pt1, Point pt2, Point pt0) {
-	double dx1 = pt1.x - pt0.x;
-	double dy1 = pt1.y - pt0.y;
-	double dx2 = pt2.x - pt0.x;
-	double dy2 = pt2.y - pt0.y;
-	return (dx1 * dx2 + dy1 * dy2)
-			/ sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2) + 1e-10);
+    Mat mYuv(height + height/2, width, CV_8UC1, (unsigned char *)_yuv);
+    Mat mBgra(height, width, CV_8UC4, (unsigned char *)_bgra);
+    Mat mGray(height, width, CV_8UC1, (unsigned char *)_yuv);
+
+    CvSize size = cvSize(width, height);
+    IplImage *hsv_frame    = cvCreateImage(size, IPL_DEPTH_8U, 3);
+    IplImage *thresholded  = cvCreateImage(size, IPL_DEPTH_8U, 1);
+
+    IplImage img_color = mBgra;
+    IplImage img_gray = mGray;
+
+    //Please make attention about BGRA byte order
+    //ARGB stored in java as int array becomes BGRA at native level
+    cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
+
+    // convert to HSV color-space
+    cvCvtColor(&img_color, hsv_frame, CV_BGR2HSV);
+
+    // Filter out colors which are out of range. (ping-pong ball hue ~ 14)
+    cvInRangeS(hsv_frame, cvScalar(9, 70, 80, 0), cvScalar(19, 250, 250, 0), thresholded);
+
+    // Memory for hough circles
+    CvMemStorage* storage = cvCreateMemStorage(0);
+
+    // some smoothing of the image
+    cvSmooth( thresholded, thresholded, CV_GAUSSIAN, 9, 9 );
+
+    // show thresholded
+    if(debug)    cvCvtColor(thresholded, &img_color, CV_GRAY2BGR);
+
+    // find circle pattterns
+    CvSeq* circles = cvHoughCircles(thresholded, storage, CV_HOUGH_GRADIENT, 1.5,
+                                        thresholded->height/4, 100, 40, 15, 80);
+    // draw found circles
+    //for (int i = 0; i<circles->total; i++)
+    for (int i = 0; i<circles->total && i<3; i++) // max 3 circles
+    {
+        float* p = (float*)cvGetSeqElem( circles, i );
+        circle(mBgra, Point(p[0],p[1]), 3, Scalar(0,255,0,255), 2);
+        circle(mBgra, Point(p[0],p[1]), p[2], Scalar(0,0,255,255), 4);
+    }
+
+    // cleanup resources
+    cvReleaseMemStorage(&storage);
+    cvReleaseImage(&hsv_frame);
+    cvReleaseImage(&thresholded);
+
+    env->ReleaseIntArrayElements(bgra, _bgra, 0);
+    env->ReleaseByteArrayElements(yuv, _yuv, 0);
 }
 
-void findSquares(const Mat& image, vector<vector<Point> >& squares) {
-	squares.clear();
-	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
-
-	// down-scale and upscale the image to filter out the noise
-	pyrDown(image, pyr, Size(image.cols / 2, image.rows / 2));
-	pyrUp(pyr, timg, image.size());
-	vector < vector<Point> > contours;
-
-	// find squares in every color plane of the image
-	for (int c = 0; c < 3; c++) {
-		int ch[] = { c, 0 };
-		mixChannels(&timg, 1, &gray0, 1, ch, 1);
-
-		// try several threshold levels
-		for (int l = 0; l < N; l++) {
-			// hack: use Canny instead of zero threshold level.
-			// Canny helps to catch squares with gradient shading
-			if (l == 0) {
-				// apply Canny. Take the upper threshold from slider
-				// and set the lower to 0 (which forces edges merging)
-				Canny(gray0, gray, 0, thresh, 5);
-				// dilate canny output to remove potential
-				// holes between edge segments
-				dilate(gray, gray, Mat(), Point(-1, -1));
-			} else {
-				// apply threshold if l!=0:
-				//     tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
-				gray = gray0 >= (l + 1) * 255 / N;
-			}
-
-			// find contours and store them all as a list
-			findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
-
-			vector<Point> approx;
-
-			// test each contour
-			for (size_t i = 0; i < contours.size(); i++) {
-				// approximate contour with accuracy proportional
-				// to the contour perimeter
-				approxPolyDP(Mat(contours[i]), approx,
-						arcLength(Mat(contours[i]), true) * 0.02, true);
-
-				// square contours should have 4 vertices after approximation
-				// relatively large area (to filter out noisy contours)
-				// and be convex.
-				// Note: absolute value of an area is used because
-				// area may be positive or negative - in accordance with the
-				// contour orientation
-				if (approx.size() == 4 && fabs(contourArea(Mat(approx))) > 1000
-						&& isContourConvex(Mat(approx))) {
-					double maxCosine = 0;
-
-					for (int j = 2; j < 5; j++) {
-						// find the maximum cosine of the angle between joint edges
-						double cosine = fabs(
-								angle(approx[j % 4], approx[j - 2],
-										approx[j - 1]));
-						maxCosine = MAX(maxCosine, cosine);
-					}
-
-					// if cosines of all angles are small
-					// (all angles are ~90 degree) then write quandrange
-					// vertices to resultant sequence
-					if (maxCosine < 0.3)
-						squares.push_back(approx);
-				}
-			}
-		}
-	}
-}
-void drawSquares(Mat& image, const vector<vector<Point> >& squares){
-	size_t max = 0;
-	size_t maxidx = 0 ;
-	for( size_t i = 0 ; i < squares.size() ; i++){
-		int len = (squares[i][0].x - squares[i][2].x)* (squares[i][0].x - squares[i][2].x) +
-				(squares[i][0].y - squares[i][2].y)*(squares[i][0].y - squares[i][2].y);
-		if( len > max ){
-			max = len;
-			maxidx = i;
-		}
-	}
-	const Point* p = &squares[maxidx][0];
-	int n = (int) squares[maxidx].size();
-	polylines(image, &p, &n, 1, true, Scalar(0, 255, 0), 3, CV_AA, 0);
-}
-
-
-JNIEXPORT void JNICALL Java_com_example_polytest_Native_findSquares(JNIEnv *env, jobject obj, jlong addrGray, jlong addrRgba){
-	Mat& mGr = *(Mat*)addrGray;
-	Mat& mRgb = *(Mat*)addrRgba;
-	vector<vector<Point> > squares;
-
-	findSquares(mRgb, squares);
-	drawSquares(mRgb, squares);
-}
 }
