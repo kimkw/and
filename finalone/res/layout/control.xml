@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:gravity="bottom"
+    >
+<Button
+	android:id="@+id/getpoint"  
+    android:layout_width="wrap_content" 
+    android:layout_height="wrap_content" 
+	android:text="getpoint" 
+	android:layout_gravity="right"
+	android:layout_margin="10px"
+    />
+<Button
+	android:id="@+id/findfeature"  
+    android:layout_width="wrap_content" 
+    android:layout_height="wrap_content" 
+	android:text="findfeature" 
+	android:layout_gravity="right"
+	android:layout_margin="10px"
+    />
+<Button
+	android:id="@+id/save"  
+    android:layout_width="wrap_content" 
+    android:layout_height="wrap_content" 
+	android:text="save" 
+	android:layout_gravity="right"
+	android:layout_margin="10px"
+    />
+<Button
+	android:id="@+id/reset"  
+    android:layout_width="wrap_content" 
+    android:layout_height="wrap_content" 
+	android:text="reset" 
+	android:layout_gravity="right"
+	android:layout_margin="10px"
+    />
+</LinearLayout>

@@ -1,8 +1,12 @@
 package com.example.finalone;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import android.app.Activity;
@@ -10,17 +14,18 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.view.Display;
+import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
-import android.view.Window;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
-import android.view.View.OnTouchListener;
 
 public class DisplayImage extends Activity{
 	
@@ -39,28 +44,50 @@ public class DisplayImage extends Activity{
 	int d_height;
 	int b_width;
 	int b_height;
+	boolean mode = false;
 	
+	Mat tmp, gtmp, inter;
+	
+	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
+		@Override
+		public void onManagerConnected(int status){
+			switch( status){
+				case LoaderCallbackInterface.SUCCESS:
+				{
+					Log.i("FINAL","Opencv loaded successfully");
+				} break;
+				default:{
+					super.onManagerConnected(status);
+				}break;
+			}
+		}	
+	};
 	
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.image_layer);
+		if(!OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_9, this, mOpenCVCallBack)){
+			Log.e("FINAL", "Cannot connect to OpenCV Manager");
+		}
+		DisplayMetrics metrics = new DisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(metrics); 
+		d_width = metrics.widthPixels;
+		d_height = metrics.heightPixels;
 		
-		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		photo = (ImageView)findViewById(R.id.image);
 		Intent i = getIntent();
 		data = i.getByteArrayExtra("pictureData");
 		bm = BitmapFactory.decodeByteArray(data, 0, data.length);
+		
 		Matrix matrix = new Matrix();
-		matrix.postRotate(-90);
+		matrix.postRotate(90);
 		rotatedBitmap = Bitmap.createBitmap(bm,0,0,bm.getWidth(),bm.getHeight(),matrix, true);
+		Drawable drawable = new BitmapDrawable(getResources(),rotatedBitmap);
+		photo.setBackgroundDrawable(drawable);
 		b_width = rotatedBitmap.getWidth();
 		b_height = rotatedBitmap.getHeight();
 		
-		photo.setImageBitmap(rotatedBitmap);
 		
-		Display d = getWindowManager().getDefaultDisplay();
-		d_width = d.getWidth();
-		d_height = d.getHeight();
 		
 		controlInflater = LayoutInflater.from(getBaseContext());
 		View viewControl = controlInflater.inflate(R.layout.control, null);
@@ -68,16 +95,17 @@ public class DisplayImage extends Activity{
 				LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT);
 		this.addContentView(viewControl, layoutParamsControl);
 		
+		
 		findfeature = (Button)findViewById(R.id.findfeature);
 		findfeature.setOnClickListener(new Button.OnClickListener() {
 			@Override
 			public void onClick(View arg0) {
 				// TODO Auto-generated method stub
 				if(count == 4){
-					Toast toast = Toast.makeText(getApplicationContext(), "select four point", Toast.LENGTH_LONG);
-					toast.show();
+					DoImage();
 				}else{
-				//	DoImage();
+					Toast toast = Toast.makeText(getApplicationContext(), (4-count)+" dot more", Toast.LENGTH_LONG);
+					toast.show();
 				}
 			}
 		});
@@ -87,6 +115,20 @@ public class DisplayImage extends Activity{
 			@Override
 			public void onClick(View arg0) {
 				// TODO Auto-generated method stub
+				if( !mode){
+					Bitmap result = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
+					Utils.matToBitmap(tmp, result);
+					Drawable drawable = new BitmapDrawable(getResources(),result);
+					photo.setBackgroundDrawable(drawable);
+					mode = true;
+				}
+				else{
+					Bitmap result = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
+					Utils.matToBitmap(inter, result);
+					Drawable drawable = new BitmapDrawable(getResources(),result);
+					photo.setBackgroundDrawable(drawable);
+					mode = false;
+				}
 				
 			}
 		});
@@ -98,6 +140,8 @@ public class DisplayImage extends Activity{
 				if( !touchcnt){
 					touchcnt = true;
 					count = 0;
+					Toast toast = Toast.makeText(getApplicationContext(), "select four point", Toast.LENGTH_SHORT);
+					toast.show();
 				}
 			}
 		});
@@ -113,34 +157,50 @@ public class DisplayImage extends Activity{
 		
 		
 	}
+	
 	@Override
 	public boolean onTouchEvent(MotionEvent event){
 		int action = event.getAction();
 		if(action == MotionEvent.ACTION_DOWN){
-			int x = (int)event.getRawX();
-			int y = (int)event.getRawY();
+			double x = (int)event.getRawX();
+			double y = (int)event.getRawY();
 			if(touchcnt){
-				xpoint[count] = (int)(x/d_width * b_width );
-				ypoint[count] = (int)(y/d_height * b_height);
+				double temp1 =  x / (double) d_width;
+				double temp2 = temp1 * (double) b_width;
+
+				double temp3 = (double) y / (double) d_height;
+				double temp4 = temp3 * (double) b_height;
+
+				xpoint[count] = (int)temp2;
+				ypoint[count] = (int)temp4;
 				count++;
+				
+				Toast toast = Toast.makeText(getApplicationContext(), "count: "+count+" xpoint: "+xpoint[count-1]+" ypoint: "+ypoint[count-1] , Toast.LENGTH_SHORT);
+				toast.show();
 				
 				if( count == 4) touchcnt = false;
 			}
 		}
 		return true;
 	}
-	private Bitmap DoImage(){
 	
-		Bitmap result = null;
-		Mat tmp = new Mat( bm.getWidth(), bm.getHeight(), CvType.CV_8UC4);
-		Mat gtmp = new Mat( bm.getWidth(), bm.getHeight(), CvType.CV_8UC4);
-		Mat inter = new Mat();
+	private void DoImage(){
+	
+		tmp = new Mat(rotatedBitmap.getWidth(), rotatedBitmap.getHeight(), CvType.CV_8UC4);
+		gtmp = new Mat(rotatedBitmap.getWidth(), rotatedBitmap.getHeight(), CvType.CV_8UC1);
+		inter = new Mat();
 		Utils.bitmapToMat(rotatedBitmap, tmp);
 		Imgproc.cvtColor(tmp, gtmp, Imgproc.COLOR_RGB2GRAY);
-		Imgproc.Canny(gtmp, inter, 50, 50);
-		NativeJava.findfeature(gtmp.getNativeObjAddr(), inter.getNativeObjAddr(), xpoint, ypoint);
-		Utils.matToBitmap(tmp, result);
+		double thresh = Imgproc.threshold(gtmp, inter, -1, 255, Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU);
+		Imgproc.Canny(inter, inter, thresh*0.4, thresh);
+		Imgproc.dilate(inter, inter, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2,2)));
+		NativeJava.findfeature(tmp.getNativeObjAddr(), gtmp.getNativeObjAddr(), inter.getNativeObjAddr(), xpoint, ypoint);
 		
-		return result;
+		Bitmap result = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
+		Utils.matToBitmap(tmp, result);
+		Drawable drawable = new BitmapDrawable(getResources(),result);
+		photo.setBackgroundDrawable(drawable);
+		
+//		return result;
 	}
 }
