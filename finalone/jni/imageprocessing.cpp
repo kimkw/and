@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <android/log.h>
+#include <time.h>
 #include <opencv2\core\core.hpp>
 #include <opencv2\imgproc\imgproc.hpp>
 //#include "C:\Users\user\Desktop\final\android-ndk-r9d-windows-x86_64\OpenCV-2.4.9-android-sdk\OpenCV-2.4.9-android-sdk\sdk\native\jni\include\opencv2\imgproc\imgproc_c.h"
@@ -124,20 +125,19 @@ double getLinepointdist(LINE_COMP line, double x, double y){
 
 	return top/bottom;
 }
-int getlinecross(LINE_COMP l1, LINE_COMP l2, Point *cross){
-	double inv = (l1.a * l2.b - l2.a * l1.b);
-	if(inv = 0) return 0;
-	double x = (l2.b * l1.c) - (l1.b * l2.c);
-	double y = -(l2.a * l1.c)+ (l1.a * l2.c);
-	x = x/inv;
-	y = y/inv;
-	cross->x =x;
-	cross->y =y;
+int getlinecross(LINE_COMP line1, LINE_COMP line2, Point *cross){
+	double x,y;
+	double tmp1,tmp2;
+	tmp1 = (line2.c * line1.b) - (line1.c * line2.b);
+	tmp2 = (line1.a * line2.b) - (line2.a * line1.b);
+	x = tmp1/ tmp2;
+	tmp1 = (line1.a * line2.c) - (line2.a * line1.c);
+	tmp2 = (line2.a * line1.b) - (line1.a * line2.b);
+	y = tmp1/ tmp2;
+	cross->x = x;
+	cross->y = y;
 
-	//LOGI("y : %f", inv);
-
-	return 1;
-
+	LOGI("%f, %f", x,y);
 }
 double getTheta(double x1, double y1, double x2, double y2){
 	double result = 0;
@@ -154,174 +154,203 @@ double getTheta(double x1, double y1, double x2, double y2){
 	}
 
 	return result;
-}
+}/*
 void removeoutlier(vector<Vec4i>& lines) {
 	double l1_avg;
 	double l2_avg;
 	double l3_avg;
 	double l4_avg;
 
-	LOGI("1 : %d ", l1.size());
-	LOGI("2 : %d ", l2.size());
-	LOGI("3 : %d ", l3.size());
-	LOGI("4 : %d ", l4.size());
+	LINE_COMP line1_t;
+	vector<LENGTH> length1;
 
-	LINE_COMP l11;
+
 	for (int i = 0; i < l1.size(); i++) {
-
+		double tmp = 0;
 		makeline(lines[l1[i]][0], lines[l1[i]][1], lines[l1[i]][2],
-				lines[l1[i]][3], &l11);
+				lines[l1[i]][3], &line1_t);
 		double len, len1, len2;
-		vector<int> vote;
-
-
+		len = 0;
 		for (int j = 0; j < l1.size(); j++) {
-			len1 = getLinepointdist(l11, lines[l1[j]][0], lines[l1[j]][1]);
-			len2 = getLinepointdist(l11, lines[l1[j]][2], lines[l1[j]][3]);
-			if (len1 < len2) {
-				if (len1 > linetresh) {
-					vote.push_back(j);
-				}
-			} else {
-				if (len2 > linetresh) {
-					vote.push_back(j);
-				}
-			}
+			len1 = getLinepointdist(line1_t, lines[l1[j]][0], lines[l1[j]][1]);
+			len2 = getLinepointdist(line1_t, lines[l1[j]][2], lines[l1[j]][3]);
+			if (len1 < len2)
+				len += len1;
+			else
+				len += len2;
 		}
-		sort(vote.begin(), vote.end());
-		int votecount = 0;
-		int key = vote[0];
-		for (int j = 1; j < vote.size(); j++) {
-			if (vote[j] == key) {
-				votecount++;
-				continue;
-			}
-			if (votecount > (double) vote.size() / 0.6) {
-				l1.erase(l1.begin() + vote[j - 1]);
-			}
-			votecount = 0;
-			key = vote[j];
-		}
-
+		LENGTH temp;
+		temp.index = i;
+		temp.len = len;
+		length1.push_back(temp);
 	}
-
-	LOGI("1");
-	LINE_COMP l22;
+	int min_idx;
+	double min_len = DBL_MAX;
+	for (int i = 0; i < length1.size(); i++) {
+		if (min_len > length1[i].len) {
+			min_idx = length1[i].index;
+			min_len = length1[i].len;
+		}
+	}
+	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
+			lines[min_idx][3], &line1_t);
+	for (int i = 0; i < l1.size(); i++) {
+		double len1, len2;
+		len1 = getLinepointdist(line1_t, lines[l1[i]][0], lines[l1[i]][1]);
+		len2 = getLinepointdist(line1_t, lines[l1[i]][2], lines[l1[i]][3]);
+		if (len1 < len2) {
+			if (len1 > linetresh) {
+				l1.erase(l1.begin() + i);
+			}
+		} else {
+			if (len2 > linetresh) {
+				l1.erase(l1.begin() + i);
+			}
+		}
+	}
+	LOGI("l1 end");
+	LINE_COMP line2_t;
+	vector<LENGTH> length2;
 	for (int i = 0; i < l2.size(); i++) {
-		LOGI("11");
+		double tmp = 0;
 		makeline(lines[l2[i]][0], lines[l2[i]][1], lines[l2[i]][2],
-				lines[l2[i]][3], &l22);
+				lines[l2[i]][3], &line2_t);
 		double len, len1, len2;
-		vector<int> vote;
-
-		LOGI("22");
+		len = 0;
 		for (int j = 0; j < l2.size(); j++) {
-			len1 = getLinepointdist(l22, lines[l2[j]][0], lines[l2[j]][1]);
-			len2 = getLinepointdist(l22, lines[l2[j]][2], lines[l2[j]][3]);
-			if (len1 < len2) {
-				if (len1 > linetresh) {
-					vote.push_back(j);
-				}
-			} else {
-				if (len2 > linetresh) {
-					vote.push_back(j);
-				}
-			}
+			len1 = getLinepointdist(line2_t, lines[l2[j]][0], lines[l2[j]][1]);
+			len2 = getLinepointdist(line2_t, lines[l2[j]][2], lines[l2[j]][3]);
+			if (len1 < len2)
+				len += len1;
+			else
+				len += len2;
 		}
-		LOGI("33");
-		sort(vote.begin(), vote.end());
-		int votecount = 0;
-		int key = vote[0];
-		LOGI("44");
-		for (int j = 1; j < vote.size(); j++) {
-			if (vote[j] == key) {
-				votecount++;
-				continue;
-			}
-			if (votecount > (double) vote.size() / 0.6) {
-				l2.erase(l2.begin() + vote[j - 1]);
-			}
-			votecount = 0;
-			key = vote[j];
-		}
-		LOGI("55");
+		LENGTH temp;
+		temp.index = i;
+		temp.len = len;
+		length2.push_back(temp);
 	}
-	LOGI("2");
-	LINE_COMP l33;
+	min_idx = 0;
+	min_len = DBL_MAX;
+	for (int i = 0; i < length2.size(); i++) {
+		if (min_len > length2[i].len) {
+			min_idx = length2[i].index;
+			min_len = length2[i].len;
+		}
+	}
+	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
+			lines[min_idx][3], &line2_t);
+	for (int i = 0; i < l2.size(); i++) {
+		double len1, len2;
+		len1 = getLinepointdist(line2_t, lines[l2[i]][0], lines[l2[i]][1]);
+		len2 = getLinepointdist(line2_t, lines[l2[i]][2], lines[l2[i]][3]);
+		if (len1 < len2) {
+			if (len1 > linetresh) {
+				l2.erase(l2.begin() + i);
+			}
+		} else {
+			if (len2 > linetresh) {
+				l2.erase(l2.begin() + i);
+			}
+		}
+	}
+
+	LOGI("l2 end");
+
+	LINE_COMP line3_t;
+	vector < LENGTH > length3;
 	for (int i = 0; i < l3.size(); i++) {
+		double tmp = 0;
 		makeline(lines[l3[i]][0], lines[l3[i]][1], lines[l3[i]][2],
-				lines[l3[i]][3], &l33);
+				lines[l3[i]][3], &line3_t);
 		double len, len1, len2;
-		vector<int> vote;
-
+		len = 0;
 		for (int j = 0; j < l3.size(); j++) {
-			len1 = getLinepointdist(l33, lines[l3[j]][0], lines[l3[j]][1]);
-			len2 = getLinepointdist(l33, lines[l3[j]][2], lines[l3[j]][3]);
-			if (len1 < len2) {
-				if (len1 > linetresh) {
-					vote.push_back(j);
-				}
-			} else {
-				if (len2 > linetresh) {
-					vote.push_back(j);
-				}
-			}
+			len1 = getLinepointdist(line3_t, lines[l3[j]][0], lines[l3[j]][1]);
+			len2 = getLinepointdist(line3_t, lines[l3[j]][2], lines[l3[j]][3]);
+			if (len1 < len2)
+				len += len1;
+			else
+				len += len2;
 		}
-		sort(vote.begin(), vote.end());
-		int votecount = 0;
-		int key = vote[0];
-		for (int j = 1; j < vote.size(); j++) {
-			if (vote[j] == key) {
-				votecount++;
-				continue;
+		LENGTH temp;
+		temp.index = i;
+		temp.len = len;
+		length3.push_back(temp);
+	}
+	min_len = DBL_MAX;
+	for (int i = 0; i < length3.size(); i++) {
+		if (min_len > length3[i].len) {
+			min_idx = length3[i].index;
+			min_len = length3[i].len;
+		}
+	}
+	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
+			lines[min_idx][3], &line3_t);
+	for (int i = 0; i < l3.size(); i++) {
+		double len1, len2;
+		len1 = getLinepointdist(line3_t, lines[l3[i]][0], lines[l3[i]][1]);
+		len2 = getLinepointdist(line3_t, lines[l3[i]][2], lines[l3[i]][3]);
+		if (len1 < len2) {
+			if (len1 > linetresh) {
+				l3.erase(l3.begin() + i);
 			}
-			if (votecount > (double) vote.size() / 0.6) {
-				l3.erase(l3.begin() + vote[j - 1]);
+		} else {
+			if (len2 > linetresh) {
+				l3.erase(l3.begin() + i);
 			}
-			votecount = 0;
-			key = vote[j];
 		}
 	}
 
-	LOGI("3");
-	LINE_COMP l44;
+	LOGI("l3 end");
+
+	LINE_COMP line4_t;
+	vector < LENGTH > length4;
 	for (int i = 0; i < l4.size(); i++) {
+		double tmp = 0;
 		makeline(lines[l4[i]][0], lines[l4[i]][1], lines[l4[i]][2],
-				lines[l4[i]][3], &l44);
+				lines[l4[i]][3], &line4_t);
 		double len, len1, len2;
-		vector<int> vote;
-
+		len = 0;
 		for (int j = 0; j < l4.size(); j++) {
-			len1 = getLinepointdist(l44, lines[l4[j]][0], lines[l4[j]][1]);
-			len2 = getLinepointdist(l44, lines[l4[j]][2], lines[l4[j]][3]);
-			if (len1 < len2) {
-				if (len1 > linetresh) {
-					vote.push_back(j);
-				}
-			} else {
-				if (len2 > linetresh) {
-					vote.push_back(j);
-				}
-			}
+			len1 = getLinepointdist(line4_t, lines[l4[j]][0], lines[l4[j]][1]);
+			len2 = getLinepointdist(line4_t, lines[l4[j]][2], lines[l4[j]][3]);
+			if (len1 < len2)
+				len += len1;
+			else
+				len += len2;
 		}
-		sort(vote.begin(), vote.end());
-		int votecount = 0;
-		int key = vote[0];
-		for (int j = 1; j < vote.size(); j++) {
-			if (vote[j] == key) {
-				votecount++;
-				continue;
-			}
-			if (votecount > (double) vote.size() / 0.6) {
-				l4.erase(l4.begin() + vote[j - 1]);
-			}
-			votecount = 0;
-			key = vote[j];
+		LENGTH temp;
+		temp.index = i;
+		temp.len = len;
+		length4.push_back(temp);
+	}
+	min_len = DBL_MAX;
+	for (int i = 0; i < length4.size(); i++) {
+		if (min_len > length4[i].len) {
+			min_idx = length4[i].index;
+			min_len = length4[i].len;
 		}
 	}
-	LOGI("4");
+	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
+			lines[min_idx][3], &line4_t);
+	for (int i = 0; i < l4.size(); i++) {
+		double len1, len2;
+		len1 = getLinepointdist(line4_t, lines[l4[i]][0], lines[l4[i]][1]);
+		len2 = getLinepointdist(line4_t, lines[l4[i]][2], lines[l4[i]][3]);
+		if (len1 < len2) {
+			if (len1 > linetresh) {
+				l4.erase(l4.begin() + i);
+			}
+		} else {
+			if (len2 > linetresh) {
+				l4.erase(l4.begin() + i);
+			}
+		}
+	}
 
-}
+	LOGI("l4 end");
+}*/
 void find_line_point(vector<Vec4i>& lines){
 
 	l1.clear();
@@ -358,7 +387,6 @@ void find_line_point(vector<Vec4i>& lines){
 			}
 			if( cnt == 0  ) continue;
 			// choice one
-			LOGI("%d", cnt);
 			int cnt_02 = 0;
 			int cnt_13 = 0;
 			for( int j = 0 ; j < cnt ; j++){
@@ -422,7 +450,120 @@ void find_line_point(vector<Vec4i>& lines){
 			}
 		}
 	}
-//	removeoutlier(lines);
+}
+void line2dot(Point *dot, vector<Vec4i>& lines, vector<int>& index){
+	int cnt = 0;
+	for(int i = 0 ; i < index.size() ; i++){
+		dot[cnt].x = lines[index[i]][0];
+		dot[cnt].y = lines[index[i]][1];
+		cnt++;
+		dot[cnt].x = lines[index[i]][2];
+		dot[cnt].y = lines[index[i]][3];
+		cnt++;
+	}
+}
+bool find_in_samples(Point *samples, int no_samples, Point *data){
+	for( int i = 0 ; i < no_samples; i++){
+		if( samples[i].x == data->x && samples[i].y == data->y){
+			return true;
+		}
+	}
+	return false;
+}
+void get_samples(Point *samples, int no_samples, Point *data, int no_data){
+	srand(time(NULL));
+	for( int i = 0 ; i < no_samples ;){
+		int j = rand()%no_data;
+		if(!find_in_samples(samples, i, &data[j])){
+			samples[i] = data[j];
+			i++;
+		}
+	}
+}
+int compute_model_parameter(Point samples[], int no_samples, LINE_COMP &model){
+	// using PCA
+	double sx = 0 , sy = 0;
+	double sxx = 0, syy = 0;
+	double sxy = 0, sw = 0;
+
+	for( int i = 0 ; i < no_samples ; i++){
+		double x = samples[i].x;
+		double y = samples[i].y;
+
+		sx += x;
+		sy += y;
+		sxx += x*x;
+		sxy += x*y;
+		syy += y*y;
+		sw += 1;
+	}
+	// variance;
+
+	double vxx = (sxx - sx*sx/sw)/sw;
+	double vxy = (sxy - sx*sy/sw)/sw;
+	double vyy = (syy - sy*sy/sw)/sw;
+
+	//axis
+	double theta = atan2(2*vxy, vxx-vyy)/2;
+
+	double mx = cos(theta);
+	double my = sin(theta);
+	double sx1 = sx/sw;
+	double sy1 = sy/sw;
+	// line equation : sin(theta)*(x-sx1) = cos(theta)*(y-sy1)
+
+	model.a = my;
+	model.b = -mx;
+	model.c = my * (-sx1) + mx * sy1;
+
+	return 1;
+
+
+}
+double model_verification(Point *inliers, int *no_inliers, LINE_COMP estimated_model, Point *data, int no_data, double distance_threshold){
+	*no_inliers = 0;
+	double cost = 0;
+	for( int i = 0 ; i < no_data ; i++){
+		double distance = getLinepointdist(estimated_model,data[i].x, data[i].y );
+		if( distance < distance_threshold){
+			cost += 1.;
+			inliers[*no_inliers] = data[i];
+			++(*no_inliers);
+		}
+	}
+	return cost;
+}
+double ransac_line_fitting(Point *data, int no_data, LINE_COMP &model, double distance_threshold ){
+	const int no_samples = 2;
+	if( no_data < no_samples){
+		return 0;
+	}
+
+	Point *samples = new Point[no_samples];
+	int no_inliers = 0;
+	Point *inliers = new Point[no_data];
+
+	LINE_COMP estimated_model;
+	double max_cost  = 0;
+
+	int max_iteration = (int)(1+log(1.-0.99)/log(1.-pow(0.5, no_samples)));
+	for( int i = 0 ; i < max_iteration ; i++){
+		// hypothesis
+		get_samples(samples, no_samples, data, no_data);
+		// predict parameter
+		compute_model_parameter(samples, no_samples, estimated_model);
+
+		// verification
+		double cost = model_verification(inliers, &no_inliers, estimated_model, data, no_data, distance_threshold);
+		if( max_cost < cost){
+			max_cost = cost;
+			compute_model_parameter(inliers, no_inliers, model);
+		}
+	}
+	delete [] samples;
+	delete [] inliers;
+
+	return max_cost;
 }
 
 extern "C"{
@@ -463,47 +604,121 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	LOGI("l4 : %d", l4.size());
 
 	for( int i = 0; i < l1.size(); i++) {
-			LOGI("idx : %d", l1[i]);
-			temp.x = lines[l1[i]][0];
-			temp.y = lines[l1[i]][1];
-			circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
-			temp.x = lines[l1[i]][2];
-			temp.y = lines[l1[i]][3];
-			circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
-		}
-		for( int i = 0; i < l2.size(); i++) {
-			temp.x = lines[l2[i]][0];
-			temp.y = lines[l2[i]][1];
-			circle(mBgra, temp, 2,Scalar(255,0,255,255),20);
-			temp.x = lines[l2[i]][2];
-			temp.y = lines[l2[i]][3];
-			circle(mBgra, temp, 2,Scalar(255,0,255,255),20);
-		}
-		for( int i = 0; i < l3.size(); i++) {
-			temp.x = lines[l3[i]][0];
-			temp.y = lines[l3[i]][1];
-			circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
-			temp.x = lines[l3[i]][2];
-			temp.y = lines[l3[i]][3];
-			circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
-		}
-		for( int i = 0; i < l4.size(); i++) {
-			temp.x = lines[l4[i]][0];
-			temp.y = lines[l4[i]][1];
-			circle(mBgra, temp, 2,Scalar(255,255,255,255),20);
-			temp.x = lines[l4[i]][2];
-			temp.y = lines[l4[i]][3];
-			circle(mBgra, temp, 2,Scalar(255,255,255,255),20);
-		}
+		temp.x = lines[l1[i]][0];
+		temp.y = lines[l1[i]][1];
+		circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
+		temp.x = lines[l1[i]][2];
+		temp.y = lines[l1[i]][3];
+		circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
+	}
+	for( int i = 0; i < l2.size(); i++) {
+		temp.x = lines[l2[i]][0];
+		temp.y = lines[l2[i]][1];
+		circle(mBgra, temp, 2,Scalar(255,0,255,255),20);
+		temp.x = lines[l2[i]][2];
+		temp.y = lines[l2[i]][3];
+		circle(mBgra, temp, 2,Scalar(255,0,255,255),20);
+	}
+	for( int i = 0; i < l3.size(); i++) {
+		temp.x = lines[l3[i]][0];
+		temp.y = lines[l3[i]][1];
+		circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
+		temp.x = lines[l3[i]][2];
+		temp.y = lines[l3[i]][3];
+		circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
+	}
+	for( int i = 0; i < l4.size(); i++) {
+		temp.x = lines[l4[i]][0];
+		temp.y = lines[l4[i]][1];
+		circle(mBgra, temp, 2,Scalar(255,255,255,255),20);
+		temp.x = lines[l4[i]][2];
+		temp.y = lines[l4[i]][3];
+		circle(mBgra, temp, 2,Scalar(255,255,255,255),20);
+	}
 
-		for( int i = 0 ; i < lines.size() ; i++){
-				temp.x = lines[i][0];
-				temp.y = lines[i][1];
-				circle(mBgra, temp, 2,Scalar(255,0,0,255),4);
-				temp.x = lines[i][2];
-				temp.y = lines[i][3];
-				circle(mBgra, temp, 2,Scalar(255,0,0,255),4);
-			}
+	Point *dot1 = new Point[l1.size()*2];
+	line2dot(dot1, lines, l1);
+	LINE_COMP line1;
+	ransac_line_fitting(dot1, l1.size()*2, line1, 50 );
+	delete [] dot1;
+
+	Point *dot2 = new Point[l2.size()*2];
+	line2dot(dot2, lines, l2);
+	LINE_COMP line2;
+	ransac_line_fitting(dot2, l2.size()*2, line2, 50 );
+	delete [] dot2;
+
+	Point *dot3 = new Point[l3.size()*2];
+	line2dot(dot3, lines, l3);
+	LINE_COMP line3;
+	ransac_line_fitting(dot3, l3.size()*2, line3, 50 );
+	delete [] dot3;
+
+	Point *dot4 = new Point[l4.size()*2];
+	line2dot(dot4, lines, l4);
+	LINE_COMP line4;
+	ransac_line_fitting(dot4, l4.size()*2, line4, 50 );
+	delete [] dot4;
+
+
+
+	Point crspt[4];
+	getlinecross(line1, line2, &crspt[0]);
+	getlinecross(line2, line3, &crspt[1]);
+	getlinecross(line3, line4, &crspt[2]);
+	getlinecross(line4, line1, &crspt[3]);
+	for( int i = 0 ; i < 4 ; i++){
+		circle(mBgra, crspt[i], 2, Scalar(255,0,0,255),30 );
+		//LOGI("%d, %d", crspt[i].x, crspt[i].y);
+	}
+
+	/*removeoutlier(lines);
+
+	for( int i = 0; i < l1.size(); i++) {
+		temp.x = lines[l1[i]][0];
+		temp.y = lines[l1[i]][1];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+		temp.x = lines[l1[i]][2];
+		temp.y = lines[l1[i]][3];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+	}
+	for( int i = 0; i < l2.size(); i++) {
+		temp.x = lines[l2[i]][0];
+		temp.y = lines[l2[i]][1];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+		temp.x = lines[l2[i]][2];
+		temp.y = lines[l2[i]][3];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+	}
+	for( int i = 0; i < l3.size(); i++) {
+		temp.x = lines[l3[i]][0];
+		temp.y = lines[l3[i]][1];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+		temp.x = lines[l3[i]][2];
+		temp.y = lines[l3[i]][3];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+	}
+	for( int i = 0; i < l4.size(); i++) {
+		temp.x = lines[l4[i]][0];
+		temp.y = lines[l4[i]][1];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+		temp.x = lines[l4[i]][2];
+		temp.y = lines[l4[i]][3];
+		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
+	}
+
+*/
+
+	for( int i = 0; i < lines.size(); i++) {
+		temp.x = lines[i][0];
+		temp.y = lines[i][1];
+		circle(mBgra, temp, 2,Scalar(255,0,0,255),4);
+		temp.x = lines[i][2];
+		temp.y = lines[i][3];
+		circle(mBgra, temp, 2,Scalar(255,0,0,255),4);
+	}
+
+
 	//draw near line
 	/*
 	for( int i = 0 ; i < nearindex.size() ; i++){
