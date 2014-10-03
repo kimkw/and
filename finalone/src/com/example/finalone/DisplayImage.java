@@ -1,4 +1,4 @@
-package com.example.finalone;
+package com.example.finalone1;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
@@ -38,7 +38,7 @@ public class DisplayImage extends Activity{
 	private int count = 0;
 	private boolean touchcnt = false;
 	LayoutInflater controlInflater = null;
-	Button findfeature, save, getpoint, reset;
+	Button findfeature, canny, getpoint, warp, rotate;
 	
 	int d_width;
 	int d_height;
@@ -46,7 +46,8 @@ public class DisplayImage extends Activity{
 	int b_height;
 	boolean mode = false;
 	
-	Mat tmp, gtmp, inter;
+	Mat tmp, gtmp, inter, warpinter;
+	Bitmap warpingresult;
 	
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
 		@Override
@@ -110,8 +111,8 @@ public class DisplayImage extends Activity{
 			}
 		});
 		
-		save = (Button)findViewById(R.id.save);
-		save.setOnClickListener(new Button.OnClickListener() {
+		canny = (Button)findViewById(R.id.canny);
+		canny.setOnClickListener(new Button.OnClickListener() {
 			@Override
 			public void onClick(View arg0) {
 				// TODO Auto-generated method stub
@@ -146,12 +147,31 @@ public class DisplayImage extends Activity{
 			}
 		});
 		
-		reset = (Button)findViewById(R.id.reset);
-		reset.setOnClickListener(new Button.OnClickListener() {
+		warp = (Button)findViewById(R.id.warp);
+		warp.setOnClickListener(new Button.OnClickListener() {
 			@Override
 			public void onClick(View arg0) {
 				// TODO Auto-generated method stub
+				warpinter = new Mat(rotatedBitmap.getWidth(), rotatedBitmap.getHeight(), CvType.CV_8UC4);
+				Utils.bitmapToMat(rotatedBitmap, warpinter);
+				NativeJava.warp(warpinter.getNativeObjAddr());
+				warpingresult = Bitmap.createBitmap(warpinter.cols(), warpinter.rows(),Bitmap.Config.ARGB_8888);
+				Utils.matToBitmap(warpinter, warpingresult);
+				Drawable drawable = new BitmapDrawable(getResources(),warpingresult);
+				photo.setBackgroundDrawable(drawable);
 				
+			}
+		});
+		
+		rotate = (Button)findViewById(R.id.rotate);
+		rotate.setOnClickListener(new Button.OnClickListener() {
+			@Override
+			public void onClick(View arg0) {
+				Matrix matrix = new Matrix();
+				matrix.postRotate(180);
+				Bitmap rotated =Bitmap.createBitmap(warpingresult,0,0,warpingresult.getWidth(),warpingresult.getHeight(),matrix, true); 
+				Drawable drawable = new BitmapDrawable(getResources(),rotated);
+				photo.setBackgroundDrawable(drawable);
 			}
 		});
 		

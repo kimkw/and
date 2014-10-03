@@ -23,11 +23,11 @@ using namespace cv;
 
 int thresh = 50;
 int cornertresh = 20;
-double linetresh = 30;
+double linetresh = 100;
 double thetatresh = 10;
+double linediv = 30;
 Point touchpt[4];
-vector<int> nearindex;
-vector<Point> crosspoint;
+
 
 
 int maxX, maxY;
@@ -47,6 +47,8 @@ vector<int> l1;
 vector<int> l2;
 vector<int> l3;
 vector<int> l4;
+
+Point crspt[4];	// save cross point
 
 
 double distance(double x1, double y1, double x2, double y2){
@@ -154,203 +156,7 @@ double getTheta(double x1, double y1, double x2, double y2){
 	}
 
 	return result;
-}/*
-void removeoutlier(vector<Vec4i>& lines) {
-	double l1_avg;
-	double l2_avg;
-	double l3_avg;
-	double l4_avg;
-
-	LINE_COMP line1_t;
-	vector<LENGTH> length1;
-
-
-	for (int i = 0; i < l1.size(); i++) {
-		double tmp = 0;
-		makeline(lines[l1[i]][0], lines[l1[i]][1], lines[l1[i]][2],
-				lines[l1[i]][3], &line1_t);
-		double len, len1, len2;
-		len = 0;
-		for (int j = 0; j < l1.size(); j++) {
-			len1 = getLinepointdist(line1_t, lines[l1[j]][0], lines[l1[j]][1]);
-			len2 = getLinepointdist(line1_t, lines[l1[j]][2], lines[l1[j]][3]);
-			if (len1 < len2)
-				len += len1;
-			else
-				len += len2;
-		}
-		LENGTH temp;
-		temp.index = i;
-		temp.len = len;
-		length1.push_back(temp);
-	}
-	int min_idx;
-	double min_len = DBL_MAX;
-	for (int i = 0; i < length1.size(); i++) {
-		if (min_len > length1[i].len) {
-			min_idx = length1[i].index;
-			min_len = length1[i].len;
-		}
-	}
-	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
-			lines[min_idx][3], &line1_t);
-	for (int i = 0; i < l1.size(); i++) {
-		double len1, len2;
-		len1 = getLinepointdist(line1_t, lines[l1[i]][0], lines[l1[i]][1]);
-		len2 = getLinepointdist(line1_t, lines[l1[i]][2], lines[l1[i]][3]);
-		if (len1 < len2) {
-			if (len1 > linetresh) {
-				l1.erase(l1.begin() + i);
-			}
-		} else {
-			if (len2 > linetresh) {
-				l1.erase(l1.begin() + i);
-			}
-		}
-	}
-	LOGI("l1 end");
-	LINE_COMP line2_t;
-	vector<LENGTH> length2;
-	for (int i = 0; i < l2.size(); i++) {
-		double tmp = 0;
-		makeline(lines[l2[i]][0], lines[l2[i]][1], lines[l2[i]][2],
-				lines[l2[i]][3], &line2_t);
-		double len, len1, len2;
-		len = 0;
-		for (int j = 0; j < l2.size(); j++) {
-			len1 = getLinepointdist(line2_t, lines[l2[j]][0], lines[l2[j]][1]);
-			len2 = getLinepointdist(line2_t, lines[l2[j]][2], lines[l2[j]][3]);
-			if (len1 < len2)
-				len += len1;
-			else
-				len += len2;
-		}
-		LENGTH temp;
-		temp.index = i;
-		temp.len = len;
-		length2.push_back(temp);
-	}
-	min_idx = 0;
-	min_len = DBL_MAX;
-	for (int i = 0; i < length2.size(); i++) {
-		if (min_len > length2[i].len) {
-			min_idx = length2[i].index;
-			min_len = length2[i].len;
-		}
-	}
-	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
-			lines[min_idx][3], &line2_t);
-	for (int i = 0; i < l2.size(); i++) {
-		double len1, len2;
-		len1 = getLinepointdist(line2_t, lines[l2[i]][0], lines[l2[i]][1]);
-		len2 = getLinepointdist(line2_t, lines[l2[i]][2], lines[l2[i]][3]);
-		if (len1 < len2) {
-			if (len1 > linetresh) {
-				l2.erase(l2.begin() + i);
-			}
-		} else {
-			if (len2 > linetresh) {
-				l2.erase(l2.begin() + i);
-			}
-		}
-	}
-
-	LOGI("l2 end");
-
-	LINE_COMP line3_t;
-	vector < LENGTH > length3;
-	for (int i = 0; i < l3.size(); i++) {
-		double tmp = 0;
-		makeline(lines[l3[i]][0], lines[l3[i]][1], lines[l3[i]][2],
-				lines[l3[i]][3], &line3_t);
-		double len, len1, len2;
-		len = 0;
-		for (int j = 0; j < l3.size(); j++) {
-			len1 = getLinepointdist(line3_t, lines[l3[j]][0], lines[l3[j]][1]);
-			len2 = getLinepointdist(line3_t, lines[l3[j]][2], lines[l3[j]][3]);
-			if (len1 < len2)
-				len += len1;
-			else
-				len += len2;
-		}
-		LENGTH temp;
-		temp.index = i;
-		temp.len = len;
-		length3.push_back(temp);
-	}
-	min_len = DBL_MAX;
-	for (int i = 0; i < length3.size(); i++) {
-		if (min_len > length3[i].len) {
-			min_idx = length3[i].index;
-			min_len = length3[i].len;
-		}
-	}
-	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
-			lines[min_idx][3], &line3_t);
-	for (int i = 0; i < l3.size(); i++) {
-		double len1, len2;
-		len1 = getLinepointdist(line3_t, lines[l3[i]][0], lines[l3[i]][1]);
-		len2 = getLinepointdist(line3_t, lines[l3[i]][2], lines[l3[i]][3]);
-		if (len1 < len2) {
-			if (len1 > linetresh) {
-				l3.erase(l3.begin() + i);
-			}
-		} else {
-			if (len2 > linetresh) {
-				l3.erase(l3.begin() + i);
-			}
-		}
-	}
-
-	LOGI("l3 end");
-
-	LINE_COMP line4_t;
-	vector < LENGTH > length4;
-	for (int i = 0; i < l4.size(); i++) {
-		double tmp = 0;
-		makeline(lines[l4[i]][0], lines[l4[i]][1], lines[l4[i]][2],
-				lines[l4[i]][3], &line4_t);
-		double len, len1, len2;
-		len = 0;
-		for (int j = 0; j < l4.size(); j++) {
-			len1 = getLinepointdist(line4_t, lines[l4[j]][0], lines[l4[j]][1]);
-			len2 = getLinepointdist(line4_t, lines[l4[j]][2], lines[l4[j]][3]);
-			if (len1 < len2)
-				len += len1;
-			else
-				len += len2;
-		}
-		LENGTH temp;
-		temp.index = i;
-		temp.len = len;
-		length4.push_back(temp);
-	}
-	min_len = DBL_MAX;
-	for (int i = 0; i < length4.size(); i++) {
-		if (min_len > length4[i].len) {
-			min_idx = length4[i].index;
-			min_len = length4[i].len;
-		}
-	}
-	makeline(lines[min_idx][0], lines[min_idx][1], lines[min_idx][2],
-			lines[min_idx][3], &line4_t);
-	for (int i = 0; i < l4.size(); i++) {
-		double len1, len2;
-		len1 = getLinepointdist(line4_t, lines[l4[i]][0], lines[l4[i]][1]);
-		len2 = getLinepointdist(line4_t, lines[l4[i]][2], lines[l4[i]][3]);
-		if (len1 < len2) {
-			if (len1 > linetresh) {
-				l4.erase(l4.begin() + i);
-			}
-		} else {
-			if (len2 > linetresh) {
-				l4.erase(l4.begin() + i);
-			}
-		}
-	}
-
-	LOGI("l4 end");
-}*/
+}
 void find_line_point(vector<Vec4i>& lines){
 
 	l1.clear();
@@ -413,9 +219,18 @@ void find_line_point(vector<Vec4i>& lines){
 				if (len2 > tt)
 					len2 = tt;
 
-				idx = 0;
-				if (len1 > len2)
+//				idx = 0;
+//				if (len1 > len2)
+//					idx = 2;
+//
+				if( len1 < len2){
+					idx = 0;
+					if( len1 > linetresh) continue;
+				}else{
 					idx = 2;
+					if( len2 > linetresh) continue;
+				}
+
 			}else{
 				len1 = getLinepointdist(linetemp[1], lines[i][0],
 						lines[i][1]);
@@ -430,9 +245,17 @@ void find_line_point(vector<Vec4i>& lines){
 				if (len2 > tt)
 					len2 = tt;
 
-				idx = 1;
-				if (len1 > len2)
+
+//				idx = 1;
+//				if (len1 > len2)
+//					idx = 3;
+				if( len1 < len2){
+					idx = 1;
+					if( len1 > linetresh) continue;
+				}else{
 					idx = 3;
+					if( len2 > linetresh) continue;
+				}
 			}
 			switch( idx){
 			case 0:
@@ -580,7 +403,7 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	double deltaRho = 1; //1화소
 	double deltaTheta = PI/180 ; // 각도 1
 	int minVote = 5; // 선을 인정하는데 받는 최소 투표수
-	double minLength = 30; // 선에대한 최소 길이
+	double minLength = 50; // 선에대한 최소 길이
 	double maxGap = 0.;	// 선에따른 최대 허용간격
 
 	for( int i = 0 ; i < 4; i++){
@@ -591,7 +414,6 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 
 	// find line
 	lines.clear();
-	nearindex.clear();
 	HoughLinesP(mCn, lines, deltaRho, deltaTheta, minVote, minLength, maxGap);
 	find_line_point(lines);
 
@@ -662,7 +484,7 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 
 
 
-	Point crspt[4];
+
 	getlinecross(line1, line2, &crspt[0]);
 	getlinecross(line2, line3, &crspt[1]);
 	getlinecross(line3, line4, &crspt[2]);
@@ -672,42 +494,8 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 		//LOGI("%d, %d", crspt[i].x, crspt[i].y);
 	}
 
-	/*removeoutlier(lines);
 
-	for( int i = 0; i < l1.size(); i++) {
-		temp.x = lines[l1[i]][0];
-		temp.y = lines[l1[i]][1];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-		temp.x = lines[l1[i]][2];
-		temp.y = lines[l1[i]][3];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-	}
-	for( int i = 0; i < l2.size(); i++) {
-		temp.x = lines[l2[i]][0];
-		temp.y = lines[l2[i]][1];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-		temp.x = lines[l2[i]][2];
-		temp.y = lines[l2[i]][3];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-	}
-	for( int i = 0; i < l3.size(); i++) {
-		temp.x = lines[l3[i]][0];
-		temp.y = lines[l3[i]][1];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-		temp.x = lines[l3[i]][2];
-		temp.y = lines[l3[i]][3];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-	}
-	for( int i = 0; i < l4.size(); i++) {
-		temp.x = lines[l4[i]][0];
-		temp.y = lines[l4[i]][1];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-		temp.x = lines[l4[i]][2];
-		temp.y = lines[l4[i]][3];
-		circle(mBgra, temp, 2,Scalar(0,0,255,255),10);
-	}
 
-*/
 
 	for( int i = 0; i < lines.size(); i++) {
 		temp.x = lines[i][0];
@@ -719,17 +507,6 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	}
 
 
-	//draw near line
-	/*
-	for( int i = 0 ; i < nearindex.size() ; i++){
-			temp.x = lines[nearindex[i]][0];
-			temp.y = lines[nearindex[i]][1];
-			circle(mBgra, temp, 2,Scalar(255,255,0,255),4);
-			temp.x = lines[nearindex[i]][2];
-			temp.y = lines[nearindex[i]][3];
-			circle(mBgra, temp, 2,Scalar(255,255,0,255),4);
-		}
-*/
 	// find corner
 	vector<Point2f> point;
 	point.clear();
@@ -737,14 +514,6 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	goodFeaturesToTrack(mGr, point, max_count, 0.01,5,Mat(),3,0,0.04);
 
 
-	// draw cross line
-
-	for( int i = 0 ; i < crosspoint.size() ; i++){
-		temp.x = crosspoint[i].x;
-		temp.y = crosspoint[i].y;
-		//if(temp.x < 0 || temp.y < 0 || temp.x >mBgra.size().width || temp.y > mBgra.size().height ) continue;
-		circle(mBgra,temp, 2, Scalar(255,255,0,255),4);
-	}
 	//print line dot
 
 	// print corner dot
@@ -774,5 +543,49 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	temp.x = touchpt[3].x;
 	temp.y = touchpt[3].y;
 	circle(mBgra,temp, 2, Scalar(255,0,255,255),4);
+}
+
+JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jobject, jlong addrBgra){
+	Mat& mBgra = *(Mat*)addrBgra;
+
+	int width = mBgra.size().width;
+	int height = mBgra.size().height;
+
+	Point2f source_point[4];
+	Point2f dest_point[4];
+
+	for(int i = 0 ; i < 4 ; i++){
+		source_point[i].x = crspt[i].x;
+		source_point[i].y = crspt[i].y;
+	}
+	double len1 = distance(crspt[0].x, crspt[0].y, crspt[1].x, crspt[1].y);
+	double len2 = distance(crspt[1].x, crspt[1].y, crspt[2].x, crspt[2].y);
+
+	LOGI("w: %d h: %d", width, height);
+	if( len1 > len2) { // len1 is long
+		dest_point[0].x = width;
+		dest_point[0].y = 0;
+		dest_point[1].x = width;
+		dest_point[1].y = height;
+		dest_point[2].x = 0;
+		dest_point[2].y = height;
+		dest_point[3].x = 0;
+		dest_point[3].y = 0;
+	} else {
+		dest_point[0].x = 0;
+		dest_point[0].y = 0;
+		dest_point[1].x = width;
+		dest_point[1].y = 0;
+		dest_point[2].x = width;
+		dest_point[2].y = height;
+		dest_point[3].x = 0;
+		dest_point[3].y = height;
+	}
+
+
+	Mat temp = mBgra.clone();
+	Mat transform_matrix = getPerspectiveTransform(source_point,dest_point);
+	warpPerspective(temp, mBgra, transform_matrix, Size(width, height));
+
 }
 }
