@@ -78,11 +78,21 @@ public class DisplayImage extends Activity{
 		photo = (ImageView)findViewById(R.id.image);
 		Intent i = getIntent();
 		data = i.getByteArrayExtra("pictureData");
-		bm = BitmapFactory.decodeByteArray(data, 0, data.length);
-		
+		String picturePath = i.getStringExtra("pictureData2");
 		Matrix matrix = new Matrix();
-		matrix.postRotate(90);
+		if(data != null){
+			bm = BitmapFactory.decodeByteArray(data, 0, data.length);
+			matrix.postRotate(90);
+		}else{
+			bm = BitmapFactory.decodeFile(picturePath);
+			if(bm.getWidth() < bm.getHeight())
+				matrix.postRotate(0);
+			else
+				matrix.postRotate(90);
+		}
+		
 		rotatedBitmap = Bitmap.createBitmap(bm,0,0,bm.getWidth(),bm.getHeight(),matrix, true);
+		bm.recycle();
 		Drawable drawable = new BitmapDrawable(getResources(),rotatedBitmap);
 		photo.setBackgroundDrawable(drawable);
 		b_width = rotatedBitmap.getWidth();
@@ -169,7 +179,8 @@ public class DisplayImage extends Activity{
 			public void onClick(View arg0) {
 				Matrix matrix = new Matrix();
 				matrix.postRotate(180);
-				Bitmap rotated =Bitmap.createBitmap(warpingresult,0,0,warpingresult.getWidth(),warpingresult.getHeight(),matrix, true); 
+				Bitmap rotated =Bitmap.createBitmap(warpingresult,0,0,warpingresult.getWidth(),
+						warpingresult.getHeight(),matrix, true); 
 				Drawable drawable = new BitmapDrawable(getResources(),rotated);
 				photo.setBackgroundDrawable(drawable);
 			}
@@ -216,7 +227,9 @@ public class DisplayImage extends Activity{
 		Imgproc.dilate(inter, inter, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2,2)));
 		NativeJava.findfeature(tmp.getNativeObjAddr(), gtmp.getNativeObjAddr(), inter.getNativeObjAddr(), xpoint, ypoint);
 		
+		Log.i("KKW", "1111");
 		Bitmap result = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
+		Log.i("KKW", "2222");
 		Utils.matToBitmap(tmp, result);
 		Drawable drawable = new BitmapDrawable(getResources(),result);
 		photo.setBackgroundDrawable(drawable);
