@@ -7,9 +7,12 @@ import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.PictureCallback;
+import android.hardware.Camera.PreviewCallback;
 import android.hardware.Camera.ShutterCallback;
 import android.os.Bundle;
 import android.provider.MediaStore.Images;
+import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,17 +24,22 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.Toast;
 
-public class CameraActivity extends Activity implements SurfaceHolder.Callback{
+public class CameraActivity extends Activity{
 
 	private LayoutInflater mInflater = null;
 	Camera mCamera;
+	private CameraPreview camPreview;
+	private ImageView MyCameraPreview = null;
+	int width;
+	int height;
 	byte[] tempdata;
 	boolean mPreviewRunning = false;
-	private SurfaceHolder mSurfaceHolder;
-	private SurfaceView mSurfaceView;
 	Button takepicture;
+	private FrameLayout mainLayout;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -42,11 +50,31 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setContentView(R.layout.camera_activity);
 		
+		DisplayMetrics metrics = new DisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(metrics);
+		
+		
+		width = metrics.widthPixels;
+		height = metrics.heightPixels;
+		
+		MyCameraPreview = new ImageView(this);
+		SurfaceView mSurfaceView = new SurfaceView(this);
+		SurfaceHolder mSurfaceHolder = mSurfaceView.getHolder();
+		camPreview = new CameraPreview(width, height, MyCameraPreview);
+		
+		mSurfaceHolder.addCallback(camPreview);
+		mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+		
+		mainLayout = (FrameLayout)findViewById(R.id.frameLayout1);
+		mainLayout.addView(mSurfaceView,new LayoutParams(width, height));
+		mainLayout.addView(MyCameraPreview, new LayoutParams(width,height));
+		/*
 		mSurfaceView = (SurfaceView)findViewById(R.id.surface);
 		mSurfaceHolder = mSurfaceView.getHolder();
 		mSurfaceHolder.addCallback(this);
-		
 		mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+		*/
+		
 		
 		mInflater = LayoutInflater.from(this);
 		View overView = mInflater.inflate(R.layout.cameraoverlay, null);
@@ -56,7 +84,7 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 		takepicture.setOnClickListener(new OnClickListener(){
 			public void onClick(View view)
 			{
-				mCamera.takePicture(mShutterCallback, mPictureCallback, mjpeg);
+				camPreview.mCamera.takePicture(mShutterCallback, mPictureCallback, mjpeg);
 			}
 		});
 	}
@@ -82,12 +110,10 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
             if(data != null)
             {
                 tempdata=data;
-                
                 Intent showPicture = new Intent(CameraActivity.this, DisplayImage.class);
                 showPicture.putExtra("pictureData", data);
                 startActivity(showPicture);
                 //saveImage();
-                
             }
         }
     };
@@ -132,41 +158,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 		return super.onOptionsItemSelected(item);
 	}
 
-	@Override
-	public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-		// TODO Auto-generated method stub
-		try{
-			if(mPreviewRunning){
-				mCamera.stopPreview();
-				mPreviewRunning = false;
-			}
-			Camera.Parameters p = mCamera.getParameters();
-			p.setPreviewSize(w, h);
-			p.set("jpeg-quality", 70);
-			p.setPictureFormat(PixelFormat.JPEG);
-			p.setPictureSize(2048, 1232);
-			
-			mCamera.setParameters(p);
-			mCamera.setPreviewDisplay(holder);
-			mCamera.startPreview();
-			mPreviewRunning = true;
-		}catch(Exception e){
-			
-		}
-	}
 
-	@Override
-	public void surfaceCreated(SurfaceHolder arg0) {
-		// TODO Auto-generated method stub
-		mCamera = Camera.open();
-	}
 
-	@Override
-	public void surfaceDestroyed(SurfaceHolder arg0) {
-		// TODO Auto-generated method stub
-		mCamera.stopPreview();
-		mPreviewRunning = false;
-		mCamera.release();
-		mCamera = null;
-	}
 }

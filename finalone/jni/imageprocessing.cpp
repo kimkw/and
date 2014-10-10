@@ -403,7 +403,7 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	double deltaRho = 1; //1화소
 	double deltaTheta = PI/180 ; // 각도 1
 	int minVote = 5; // 선을 인정하는데 받는 최소 투표수
-	double minLength = 50; // 선에대한 최소 길이
+	double minLength = 20; // 선에대한 최소 길이
 	double maxGap = 0.;	// 선에따른 최대 허용간격
 
 	for( int i = 0 ; i < 4; i++){
@@ -587,5 +587,17 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 	Mat transform_matrix = getPerspectiveTransform(source_point,dest_point);
 	warpPerspective(temp, mBgra, transform_matrix, Size(width, height));
 
+}
+JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray yuv, jintArray bgra){
+	jbyte* _yuv = env->GetByteArrayElements(yuv,0);
+	jint* _bgra = env->GetIntArrayElements(bgra, 0);
+
+	Mat mYuv(height+height/2 , width, CV_8UC1, (unsigned char *)_yuv);
+	Mat mBgra(height, width, CV_8UC4, (unsigned char *)_bgra);
+
+	cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
+
+	env->ReleaseIntArrayElements(bgra, _bgra,0);
+	env->ReleaseByteArrayElements(yuv,_yuv,0);
 }
 }
