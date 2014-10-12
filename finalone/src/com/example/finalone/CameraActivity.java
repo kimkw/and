@@ -38,7 +38,7 @@ public class CameraActivity extends Activity{
 	int height;
 	byte[] tempdata;
 	boolean mPreviewRunning = false;
-	Button takepicture;
+	Button takepicture, start_tracking;
 	private FrameLayout mainLayout;
 	
 	@Override
@@ -87,6 +87,17 @@ public class CameraActivity extends Activity{
 				camPreview.mCamera.takePicture(mShutterCallback, mPictureCallback, mjpeg);
 			}
 		});
+		
+		start_tracking = (Button)findViewById(R.id.tracking);
+		start_tracking.setOnClickListener(new OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				// TODO Auto-generated method stub
+				if(!camPreview.startTracking) camPreview.startTracking= true;
+				else camPreview.startTracking = false;
+			}
+		});
 	}
 	ShutterCallback mShutterCallback = new ShutterCallback()
     {
@@ -109,7 +120,12 @@ public class CameraActivity extends Activity{
         {
             if(data != null)
             {
+            	//camPreview.FrameData1 = new byte[]
+            	Log.i("copy","11111111111111");
                 tempdata=data;
+                camPreview.FrameData1 = new byte[data.length];
+                System.arraycopy(data, 0, camPreview.FrameData1,0,data.length);
+                Log.i("copy","22222222222222");
                 Intent showPicture = new Intent(CameraActivity.this, DisplayImage.class);
                 showPicture.putExtra("pictureData", data);
                 startActivity(showPicture);

@@ -18,13 +18,16 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 	SurfaceHolder mHolder;
 	Camera mCamera;
 	private boolean bproc = false;
-	private byte[] FrameData = null;
+	byte[] FrameData1 = null;
+	byte[] FrameData2 = null;
 	private int[] pixels = null;
 	private int PreviewSizeWidth;
 	private int PreviewSizeHeight;
 	private int imageFormat;
 	private Bitmap bitmap = null;
 	private ImageView MyCameraPreview = null;
+	
+	boolean startTracking = false;
 	
 	Handler mHandler = new Handler(Looper.getMainLooper());
 	
@@ -83,7 +86,7 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		if( imageFormat == ImageFormat.NV21){
 			if( !bproc)
 			{
-				FrameData = data;
+				FrameData2 = data;
 				mHandler.post(Doimage);
 			}
 		}
@@ -93,9 +96,10 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		public void run()
 		{
 			bproc = true;
-			NativeJava.tracking(PreviewSizeWidth,PreviewSizeHeight,FrameData, pixels);
+			NativeJava.tracking(PreviewSizeWidth,PreviewSizeHeight,FrameData1, FrameData2, pixels, startTracking);
 			bitmap.setPixels(pixels, 0, PreviewSizeWidth, 0, 0, PreviewSizeWidth, PreviewSizeHeight);
 			MyCameraPreview.setImageBitmap(bitmap);
+			if(startTracking)System.arraycopy(FrameData2, 0, FrameData1, 0, FrameData2.length);
 			bproc = false;
 		}
 	};

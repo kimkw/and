@@ -5,6 +5,7 @@
 #include <time.h>
 #include <opencv2\core\core.hpp>
 #include <opencv2\imgproc\imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
 //#include "C:\Users\user\Desktop\final\android-ndk-r9d-windows-x86_64\OpenCV-2.4.9-android-sdk\OpenCV-2.4.9-android-sdk\sdk\native\jni\include\opencv2\imgproc\imgproc_c.h"
 //#include "C:\Users\user\Desktop\final\android-ndk-r9d-windows-x86_64\OpenCV-2.4.9-android-sdk\OpenCV-2.4.9-android-sdk\sdk\native\jni\include\opencv2\highgui\highgui.hpp"
 
@@ -27,8 +28,6 @@ double linetresh = 100;
 double thetatresh = 10;
 double linediv = 30;
 Point touchpt[4];
-
-
 
 int maxX, maxY;
 int minX, minY;
@@ -523,13 +522,6 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 		circle(mBgra,temp, 2, Scalar(0,255,0,255),4);
 	}
 
-	// touch dot
-/*	for( int i = 0 ; i < 4; i++){
-		temp.x = _xpoint[i];
-		temp.y = _ypoint[i];
-		circle(mBgra,temp, 2, Scalar(0,0,255,255),4);
-	}
-*/
 	temp.x = touchpt[0].x;
 	temp.y = touchpt[0].y;
 	circle(mBgra,temp, 2, Scalar(0,0,255,255),4);
@@ -588,16 +580,59 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 	warpPerspective(temp, mBgra, transform_matrix, Size(width, height));
 
 }
-JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray yuv, jintArray bgra){
-	jbyte* _yuv = env->GetByteArrayElements(yuv,0);
+JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray frame1, jbyteArray frame2, jintArray bgra, jboolean mode){
+
+	jbyte* _frame2 = env->GetByteArrayElements(frame2,0);
 	jint* _bgra = env->GetIntArrayElements(bgra, 0);
 
-	Mat mYuv(height+height/2 , width, CV_8UC1, (unsigned char *)_yuv);
+	Mat mYuv(height+height/2 , width, CV_8UC1, (unsigned char *)_frame2);
+	Mat mframe2(height, width, CV_8UC1,(unsigned char *)_frame2);
 	Mat mBgra(height, width, CV_8UC4, (unsigned char *)_bgra);
 
+	vector<Point2f> srcpt1(4);
+	vector<Point2f> srcpt2(4);
+	vector<uchar> status(4);
+	vector<Point2f> error(4);
 	cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
 
+	if( mode) {
+		jbyte* _frame1 = env->GetByteArrayElements(frame1,0);
+		LOGI("11111");
+		Mat mframe1(height, width, CV_8UC1,(unsigned char *)_frame1);
+		LOGI("22222");
+		for( int i = 0; i < 4; i++) {
+			Point2f temp;
+			temp.x = crspt[i].x;
+			temp.y = crspt[i].y;
+			srcpt1.push_back(temp);
+		}
+		LOGI("33333");
+		calcOpticalFlowPyrLK(
+				mframe1,
+				mframe2,
+				srcpt1,
+				srcpt2,
+				status,
+				error,
+				Size(15,15),
+				0
+		);
+		LOGI("444444");
+		for( int i = 0; i < 4; i++) {
+			CvPoint p1, p2;
+			p1.x = (int) srcpt1[i].x;
+			p1.y = (int) srcpt1[i].y;
+			p2.x = (int) srcpt2[i].x;
+			p2.y = (int) srcpt2[i].y;
+			line(mBgra, p1, p2, Scalar(0,0,255,255));
+			crspt[i].x = srcpt2[i].x;
+			crspt[i].y = srcpt2[i].y;
+		}
+		LOGI("555555");
+		env->ReleaseByteArrayElements(frame1,_frame1,0);
+	}
+
 	env->ReleaseIntArrayElements(bgra, _bgra,0);
-	env->ReleaseByteArrayElements(yuv,_yuv,0);
+	env->ReleaseByteArrayElements(frame2,_frame2,0);
 }
 }

@@ -56,6 +56,7 @@ public class DisplayImage extends Activity{
 				case LoaderCallbackInterface.SUCCESS:
 				{
 					Log.i("FINAL","Opencv loaded successfully");
+					
 				} break;
 				default:{
 					super.onManagerConnected(status);
@@ -92,7 +93,6 @@ public class DisplayImage extends Activity{
 		}
 		
 		rotatedBitmap = Bitmap.createBitmap(bm,0,0,bm.getWidth(),bm.getHeight(),matrix, true);
-		bm.recycle();
 		Drawable drawable = new BitmapDrawable(getResources(),rotatedBitmap);
 		photo.setBackgroundDrawable(drawable);
 		b_width = rotatedBitmap.getWidth();
@@ -227,9 +227,7 @@ public class DisplayImage extends Activity{
 		Imgproc.dilate(inter, inter, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2,2)));
 		NativeJava.findfeature(tmp.getNativeObjAddr(), gtmp.getNativeObjAddr(), inter.getNativeObjAddr(), xpoint, ypoint);
 		
-		Log.i("KKW", "1111");
 		Bitmap result = Bitmap.createBitmap(tmp.cols(), tmp.rows(), Bitmap.Config.ARGB_8888);
-		Log.i("KKW", "2222");
 		Utils.matToBitmap(tmp, result);
 		Drawable drawable = new BitmapDrawable(getResources(),result);
 		photo.setBackgroundDrawable(drawable);
