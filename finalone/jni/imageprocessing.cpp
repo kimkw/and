@@ -29,6 +29,9 @@ double thetatresh = 10;
 double linediv = 30;
 Point touchpt[4];
 
+Mat first;
+bool firstset = false;
+
 int maxX, maxY;
 int minX, minY;
 
@@ -398,6 +401,9 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	Mat& mCn = *(Mat*)addrCanny;
 	Mat& mBgra = *(Mat*)addrBgra;
 
+	first = mGr.clone();
+	firstset = true;
+
 	vector<Vec4i> lines;
 	double deltaRho = 1; //1화소
 	double deltaTheta = PI/180 ; // 각도 1
@@ -553,17 +559,8 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 	double len1 = distance(crspt[0].x, crspt[0].y, crspt[1].x, crspt[1].y);
 	double len2 = distance(crspt[1].x, crspt[1].y, crspt[2].x, crspt[2].y);
 
-	LOGI("w: %d h: %d", width, height);
+
 	if( len1 > len2) { // len1 is long
-		dest_point[0].x = width;
-		dest_point[0].y = 0;
-		dest_point[1].x = width;
-		dest_point[1].y = height;
-		dest_point[2].x = 0;
-		dest_point[2].y = height;
-		dest_point[3].x = 0;
-		dest_point[3].y = 0;
-	} else {
 		dest_point[0].x = 0;
 		dest_point[0].y = 0;
 		dest_point[1].x = width;
@@ -572,67 +569,106 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 		dest_point[2].y = height;
 		dest_point[3].x = 0;
 		dest_point[3].y = height;
-	}
 
+
+	}else{
+		dest_point[0].x = 0;
+		dest_point[0].y = height;
+		dest_point[1].x = 0;
+		dest_point[1].y = 0;
+		dest_point[2].x = width;
+		dest_point[2].y = 0;
+		dest_point[3].x = width;
+		dest_point[3].y = height;
+	}
 
 	Mat temp = mBgra.clone();
 	Mat transform_matrix = getPerspectiveTransform(source_point,dest_point);
 	warpPerspective(temp, mBgra, transform_matrix, Size(width, height));
 
 }
-JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray frame1, jbyteArray frame2, jintArray bgra, jboolean mode){
+JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray yuv, jintArray bgra, jboolean mode){
 
-	jbyte* _frame2 = env->GetByteArrayElements(frame2,0);
+	jbyte* _yuv = env->GetByteArrayElements(yuv,0);
 	jint* _bgra = env->GetIntArrayElements(bgra, 0);
 
-	Mat mYuv(height+height/2 , width, CV_8UC1, (unsigned char *)_frame2);
-	Mat mframe2(height, width, CV_8UC1,(unsigned char *)_frame2);
+	Mat mYuv(height+height/2 , width, CV_8UC1, (unsigned char *)_yuv);
+	Mat mGr(height, width, CV_8UC1,(unsigned char *)_yuv);
 	Mat mBgra(height, width, CV_8UC4, (unsigned char *)_bgra);
 
-	vector<Point2f> srcpt1(4);
-	vector<Point2f> srcpt2(4);
-	vector<uchar> status(4);
-	vector<Point2f> error(4);
+//	vector<Point2f> srcpt1(4);
+//	vector<Point2f> srcpt2(4);
+//	vector<uchar> status(4);
+//	vector<float> error(4);
+
+	vector<Point2f> srcpt1;
+	vector<Point2f> srcpt2;
+	vector<uchar> status;
+	vector<float> error;
 	cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
 
-	if( mode) {
-		jbyte* _frame1 = env->GetByteArrayElements(frame1,0);
-		LOGI("11111");
-		Mat mframe1(height, width, CV_8UC1,(unsigned char *)_frame1);
-		LOGI("22222");
-		for( int i = 0; i < 4; i++) {
-			Point2f temp;
-			temp.x = crspt[i].x;
-			temp.y = crspt[i].y;
-			srcpt1.push_back(temp);
-		}
-		LOGI("33333");
-		calcOpticalFlowPyrLK(
-				mframe1,
-				mframe2,
-				srcpt1,
-				srcpt2,
-				status,
-				error,
-				Size(15,15),
-				0
-		);
-		LOGI("444444");
-		for( int i = 0; i < 4; i++) {
-			CvPoint p1, p2;
-			p1.x = (int) srcpt1[i].x;
-			p1.y = (int) srcpt1[i].y;
-			p2.x = (int) srcpt2[i].x;
-			p2.y = (int) srcpt2[i].y;
-			line(mBgra, p1, p2, Scalar(0,0,255,255));
-			crspt[i].x = srcpt2[i].x;
-			crspt[i].y = srcpt2[i].y;
-		}
-		LOGI("555555");
-		env->ReleaseByteArrayElements(frame1,_frame1,0);
-	}
 
+//	cvtColor(mGr, mBgra, CV_GRAY2BGR,4);
+
+
+//	if(mode) LOGI("true     %d   %d", first.size().height, height );
+//	if( mode ) cvtColor(first, mBgra, CV_GRAY2BGR, 4);
+//	else	LOGI("false");
+
+//	if( mode ) cvtColor(first, mBgra, CV_GRAY2BGR, 4);
+
+	if(firstset) {
+		if( mode) {
+			goodFeaturesToTrack(
+					first,
+					srcpt1,
+					50,
+					0.1,
+					3
+			);
+
+
+			/*
+			for( int i = 0; i < 4; i++) {
+				Point2f temp;
+				temp.x = crspt[i].x;
+				temp.y = crspt[i].y;
+				srcpt1.push_back(temp);
+				circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
+			}*/
+			calcOpticalFlowPyrLK(
+					first,
+					mGr,
+					srcpt1,
+					srcpt2,
+					status,
+					error,
+					Size(15,15),
+					5
+			);
+			for( int i = 0; i < srcpt1.size(); i++) {
+				LOGI("%d  :  %d ", i, status[i]);
+				Point p1, p2;
+				p1.x = (int) srcpt1[i].x;
+				p1.y = (int) srcpt1[i].y;
+				p2.x = (int) srcpt2[i].x;
+				p2.y = (int) srcpt2[i].y;
+				line(mBgra, p1, p2, Scalar(0,0,255,255), 10);
+//				crspt[i].x = srcpt2[i].x;
+//				crspt[i].y = srcpt2[i].y;
+			}
+			for( int i = 0; i < 4; i++) {
+				Point2f temp;
+				temp.x = crspt[i].x;
+				temp.y = crspt[i].y;
+				circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
+			}
+			LOGI("555555");
+//			first.release();
+//			first = mGr.clone();
+		}
+	}
 	env->ReleaseIntArrayElements(bgra, _bgra,0);
-	env->ReleaseByteArrayElements(frame2,_frame2,0);
+	env->ReleaseByteArrayElements(yuv,_yuv,0);
 }
 }

@@ -83,13 +83,13 @@ public class DisplayImage extends Activity{
 		Matrix matrix = new Matrix();
 		if(data != null){
 			bm = BitmapFactory.decodeByteArray(data, 0, data.length);
-			matrix.postRotate(90);
+			matrix.postRotate(0);
 		}else{
 			bm = BitmapFactory.decodeFile(picturePath);
 			if(bm.getWidth() < bm.getHeight())
-				matrix.postRotate(0);
-			else
 				matrix.postRotate(90);
+			else
+				matrix.postRotate(0);
 		}
 		
 		rotatedBitmap = Bitmap.createBitmap(bm,0,0,bm.getWidth(),bm.getHeight(),matrix, true);

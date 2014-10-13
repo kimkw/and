@@ -123,8 +123,8 @@ public class CameraActivity extends Activity{
             	//camPreview.FrameData1 = new byte[]
             	Log.i("copy","11111111111111");
                 tempdata=data;
-                camPreview.FrameData1 = new byte[data.length];
-                System.arraycopy(data, 0, camPreview.FrameData1,0,data.length);
+//                camPreview.FrameData1 = new byte[data.length];
+//                System.arraycopy(data, 0, camPreview.FrameData1,0,data.length);
                 Log.i("copy","22222222222222");
                 Intent showPicture = new Intent(CameraActivity.this, DisplayImage.class);
                 showPicture.putExtra("pictureData", data);
@@ -153,8 +153,7 @@ public class CameraActivity extends Activity{
 
 		finish();
 	}
-
-    
+	 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
