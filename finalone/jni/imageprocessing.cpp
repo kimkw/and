@@ -28,7 +28,8 @@ double linetresh = 100;
 double thetatresh = 10;
 double linediv = 30;
 Point touchpt[4];
-
+int monitor = 0;
+bool monitorset = false;
 Mat first;
 bool firstset = false;
 
@@ -390,7 +391,73 @@ double ransac_line_fitting(Point *data, int no_data, LINE_COMP &model, double di
 
 	return max_cost;
 }
+void make_warp(Mat& src_img, Mat& dst_img, Point2f Point[],int size ){
+	Point2f dest_point[4];
+	dest_point[0].x = 0;
+	dest_point[0].y = 0;
+	dest_point[1].x = size;
+	dest_point[1].y = 0;
+	dest_point[2].x = size;
+	dest_point[2].y = size;
+	dest_point[3].x = 0;
+	dest_point[3].y = size;
 
+	Mat transform_matrix = getPerspectiveTransform(Point, dest_point);
+	warpPerspective(src_img, dst_img, transform_matrix, Size(size, size));
+}
+void makehist(Mat& image, int hist[], int size){
+	for( int i = 0 ;i < size ; i++){
+		hist[i] = 0;
+		for( int j = 0 ; j < size ; j++){
+			hist[i] += image.at<uchar>(i, j);
+		}
+		hist[i] = hist[i]/size;
+	}
+}
+double cossim(int hist1[], int hist2[], int size) {
+	int scalar = 0;
+	double sum1;
+	double sum2;
+	for( int i = 0 ; i < size ; i++){
+		scalar += hist1[i] * hist2[i];
+		sum1 += hist1[i] * hist1[i];
+		sum2 += hist2[i] * hist2[i];
+	}
+	sum1 = sqrt(sum1);
+	sum2 = sqrt(sum2);
+
+	double cos_theta = (double) scalar / (sum1*sum2);
+	double result = 1- ( 2 * acos( cos_theta) / PI ) ;
+
+	return result;
+}
+bool monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Point2f>& P2, int size, double thresh){
+
+	Mat dst1;
+	Mat dst2;
+	Point2f Point1[4];
+	Point2f Point2[4];
+
+	for( int i = 0 ;i < 4 ; i++){
+		Point1[i].x = P1[i].x;
+		Point1[i].y = P1[i].y;
+		Point2[i].x = P2[i].x;
+		Point2[i].y = P2[i].y;
+	}
+	make_warp(image1, dst1, Point1, size);
+	make_warp(image2, dst2, Point2, size);
+
+	int *hist1 = new int[size];
+	int *hist2 = new int[size];
+
+	makehist( dst1, hist1, size);
+	makehist( dst2, hist2, size);
+	double t = cossim(hist1, hist2, size);
+	LOGI("%f", t);
+	if( t > thresh) return true;
+	else	return false;
+
+}
 extern "C"{
 JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv *env,jobject, jlong addrBgra ,jlong addrGray, jlong addrCanny, jintArray xpoint, jintArray ypoint){
 
@@ -516,18 +583,8 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 	vector<Point2f> point;
 	point.clear();
 	int max_count = C_MAX_COUNT;
-	goodFeaturesToTrack(mGr, point, max_count, 0.01,5,Mat(),3,0,0.04);
-
 
 	//print line dot
-
-	// print corner dot
-	for( int i = 0 ; i < point.size() ; i++){
-		temp.x = point[i].x;
-		temp.y = point[i].y;
-		circle(mBgra,temp, 2, Scalar(0,255,0,255),4);
-	}
-
 	temp.x = touchpt[0].x;
 	temp.y = touchpt[0].y;
 	circle(mBgra,temp, 2, Scalar(0,0,255,255),4);
@@ -585,9 +642,8 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 	Mat temp = mBgra.clone();
 	Mat transform_matrix = getPerspectiveTransform(source_point,dest_point);
 	warpPerspective(temp, mBgra, transform_matrix, Size(width, height));
-
 }
-JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray yuv, jintArray bgra, jboolean mode){
+JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env, jobject obj, jint width, jint height, jbyteArray yuv, jintArray bgra, jboolean mode){
 
 	jbyte* _yuv = env->GetByteArrayElements(yuv,0);
 	jint* _bgra = env->GetIntArrayElements(bgra, 0);
@@ -607,35 +663,15 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *en
 	vector<float> error;
 	cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
 
-
-//	cvtColor(mGr, mBgra, CV_GRAY2BGR,4);
-
-
-//	if(mode) LOGI("true     %d   %d", first.size().height, height );
-//	if( mode ) cvtColor(first, mBgra, CV_GRAY2BGR, 4);
-//	else	LOGI("false");
-
-//	if( mode ) cvtColor(first, mBgra, CV_GRAY2BGR, 4);
-
 	if(firstset) {
 		if( mode) {
-			goodFeaturesToTrack(
-					first,
-					srcpt1,
-					50,
-					0.1,
-					3
-			);
-
-
-			/*
 			for( int i = 0; i < 4; i++) {
 				Point2f temp;
 				temp.x = crspt[i].x;
 				temp.y = crspt[i].y;
 				srcpt1.push_back(temp);
 				circle(mBgra, temp, 2,Scalar(0,255,255,255),20);
-			}*/
+			}
 			calcOpticalFlowPyrLK(
 					first,
 					mGr,
@@ -643,11 +679,11 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *en
 					srcpt2,
 					status,
 					error,
-					Size(15,15),
+					Size(50,50),
 					5
 			);
 			for( int i = 0; i < srcpt1.size(); i++) {
-				LOGI("%d  :  %d ", i, status[i]);
+//				LOGI("%d  :  %d ", i, status[i]);
 				Point p1, p2;
 				p1.x = (int) srcpt1[i].x;
 				p1.y = (int) srcpt1[i].y;
@@ -661,9 +697,34 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *en
 				Point2f temp;
 				temp.x = crspt[i].x;
 				temp.y = crspt[i].y;
-				circle(mBgra, temp, 2,Scalar(255,255,0,255),20);
+				circle(mBgra, temp, 2,Scalar(0,255,0,255),20);
 			}
-			LOGI("555555");
+			if( monitor % 30  == 0){
+				monitor = 0;
+				if(monitoring_change(
+					first,
+					mGr,
+					srcpt1,
+					srcpt2,
+					200,
+					0.90)){
+					LOGI("ttttttttt");
+					monitorset= true;
+					// not change
+				}else{
+					LOGI("fffffffff");
+					monitorset = false;
+					// change
+				}
+			}
+			monitor++;
+			if(!monitorset ) {
+				Point2f temp;
+				temp.x = width/2;
+				temp.y = height/2;
+				circle(mBgra, temp, 2,Scalar(255,0,0,255),100);
+			}
+//			LOGI("555555");
 //			first.release();
 //			first = mGr.clone();
 		}
