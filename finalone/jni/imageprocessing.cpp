@@ -29,7 +29,7 @@ double thetatresh = 10;
 double linediv = 30;
 Point touchpt[4];
 int monitor = 0;
-bool monitorset = false;
+bool monitorset = true;
 Mat first;
 bool firstset = false;
 
@@ -405,14 +405,23 @@ void make_warp(Mat& src_img, Mat& dst_img, Point2f Point[],int size ){
 	Mat transform_matrix = getPerspectiveTransform(Point, dest_point);
 	warpPerspective(src_img, dst_img, transform_matrix, Size(size, size));
 }
-void makehist(Mat& image, int hist[], int size){
-	for( int i = 0 ;i < size ; i++){
-		hist[i] = 0;
-		for( int j = 0 ; j < size ; j++){
-			hist[i] += image.at<uchar>(i, j);
+/*
+void makehist(Mat& image, int hist[], int histsize, int modelsize){
+	memset(hist, 0, histsize);
+	for( int i = 0 ; i < modelsize ; i++){
+		for( int j = 0 ; j < modelsize ; j++){
+			int index = image.at<uchar>(i, j) / (255/ histsize);
+			if( index == histsize) index = index-1;
+			hist[index]++;
 		}
-		hist[i] = hist[i]/size;
 	}
+//	for( int i = 0 ;i < size ; i++){
+//		hist[i] = 0;
+//		for( int j = 0 ; j < size ; j++){
+//			hist[i] += image.at<uchar>(i, j);
+//		}
+//		hist[i] = hist[i]/size;
+//	}
 }
 double cossim(int hist1[], int hist2[], int size) {
 	int scalar = 0;
@@ -430,8 +439,8 @@ double cossim(int hist1[], int hist2[], int size) {
 	double result = 1- ( 2 * acos( cos_theta) / PI ) ;
 
 	return result;
-}
-bool monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Point2f>& P2, int size, double thresh){
+}*/
+bool monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Point2f>& P2, int modelsize, int histsize, double thresh){
 
 	Mat dst1;
 	Mat dst2;
@@ -444,18 +453,41 @@ bool monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Poi
 		Point2[i].x = P2[i].x;
 		Point2[i].y = P2[i].y;
 	}
-	make_warp(image1, dst1, Point1, size);
-	make_warp(image2, dst2, Point2, size);
+	make_warp(image1, dst1, Point1, modelsize);
+	make_warp(image2, dst2, Point2, modelsize);
 
-	int *hist1 = new int[size];
-	int *hist2 = new int[size];
+	MatND hist1;
+	MatND hist2;
 
-	makehist( dst1, hist1, size);
-	makehist( dst2, hist2, size);
-	double t = cossim(hist1, hist2, size);
+	float range_0[] = {0,255};
+	const float* ranges[] = { range_0 };
+	int channels[] = {0};
+	int hist_size[] = {256};
+	hist_size[0] = histsize;
+	calcHist(&dst1, 1, channels, Mat(), hist1, 1, hist_size, ranges, true, false);
+	calcHist(&dst2, 1, channels, Mat(), hist2, 1, hist_size, ranges, true, false);
+
+	normalize(hist1, hist1, 1, 0, NORM_L1);
+	normalize(hist2, hist2, 1, 0, NORM_L1);
+
+	double bhattacharyya = compareHist(hist1, hist2,CV_COMP_BHATTACHARYYA);
+	double correl = compareHist(hist1, hist2, CV_COMP_CORREL);
+	LOGI("%f", bhattacharyya);
+	LOGI("%f", correl);
+	//if( correl - bhattacharyya > thresh) return true;
+	if( correl > thresh ) return true;
+	else	return false;
+	/*
+	int *hist1 = new int[histsize];
+	int *hist2 = new int[histsize];
+
+	makehist( dst1, hist1, histsize, modelsize);
+	makehist( dst2, hist2, histsize, modelsize);
+	double t = cossim(hist1, hist2, histsize);
 	LOGI("%f", t);
 	if( t > thresh) return true;
 	else	return false;
+	*/
 
 }
 extern "C"{
@@ -699,15 +731,16 @@ JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env
 				temp.y = crspt[i].y;
 				circle(mBgra, temp, 2,Scalar(0,255,0,255),20);
 			}
-			if( monitor % 30  == 0){
+			if( monitor % 20  == 0){
 				monitor = 0;
 				if(monitoring_change(
 					first,
 					mGr,
 					srcpt1,
 					srcpt2,
-					200,
-					0.90)){
+					300,
+					100,
+					0.9	)){
 					LOGI("ttttttttt");
 					monitorset= true;
 					// not change
