@@ -33,8 +33,11 @@ bool monitorset = true;
 Mat first;
 bool firstset = false;
 
+
 int maxX, maxY;
 int minX, minY;
+
+double test1, test2;
 
 typedef struct _LINE_COMP{
 	double a;
@@ -46,13 +49,20 @@ typedef struct _LENGTH{
 	int index;
 }LENGTH;
 
+typedef struct _DIFF{
+	double dif;
+	int count;
+}DIFF;
+
 vector<int> l1;
 vector<int> l2;
 vector<int> l3;
 vector<int> l4;
+DIFF val;
 
 Point crspt[4];	// save cross point
-
+Point savecrspt[4];
+bool track = false;
 
 double distance(double x1, double y1, double x2, double y2){
 	return sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
@@ -392,6 +402,7 @@ double ransac_line_fitting(Point *data, int no_data, LINE_COMP &model, double di
 	return max_cost;
 }
 void make_warp(Mat& src_img, Mat& dst_img, Point2f Point[],int size ){
+
 	Point2f dest_point[4];
 	dest_point[0].x = 0;
 	dest_point[0].y = 0;
@@ -440,55 +451,35 @@ double cossim(int hist1[], int hist2[], int size) {
 
 	return result;
 }*/
-bool monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Point2f>& P2, int modelsize, int histsize, double thresh){
-
+void monitoring_change(Mat& image1, Mat& image2, vector<Point2f>& P1, vector<Point2f>& P2, int modelsize, int thresh){
 	Mat dst1;
 	Mat dst2;
 	Point2f Point1[4];
 	Point2f Point2[4];
-
-	for( int i = 0 ;i < 4 ; i++){
+	for( int i = 0 ; i < 4 ; i++){
 		Point1[i].x = P1[i].x;
 		Point1[i].y = P1[i].y;
 		Point2[i].x = P2[i].x;
 		Point2[i].y = P2[i].y;
 	}
-	make_warp(image1, dst1, Point1, modelsize);
-	make_warp(image2, dst2, Point2, modelsize);
+	make_warp(image1,dst1,Point1,modelsize);
+	make_warp(image2,dst2,Point2,modelsize);
 
-	MatND hist1;
-	MatND hist2;
+	int sub_sum;
+	val.dif = 0;
+	val.count = 0;
+	for( int i = 0 ; i < modelsize ; i++){
+		for( int j = 0 ; j < modelsize ; j++){
+			int val1 = dst1.at<uchar>(i,j);
+			int val2 = dst2.at<uchar>(i,j);
+			if( abs(val1-val2) > thresh){
+				val.dif = val.dif + abs(val1-val2);
+				val.count++;
+			}
+		}
+	}
 
-	float range_0[] = {0,255};
-	const float* ranges[] = { range_0 };
-	int channels[] = {0};
-	int hist_size[] = {256};
-	hist_size[0] = histsize;
-	calcHist(&dst1, 1, channels, Mat(), hist1, 1, hist_size, ranges, true, false);
-	calcHist(&dst2, 1, channels, Mat(), hist2, 1, hist_size, ranges, true, false);
-
-	normalize(hist1, hist1, 1, 0, NORM_L1);
-	normalize(hist2, hist2, 1, 0, NORM_L1);
-
-	double bhattacharyya = compareHist(hist1, hist2,CV_COMP_BHATTACHARYYA);
-	double correl = compareHist(hist1, hist2, CV_COMP_CORREL);
-	LOGI("%f", bhattacharyya);
-	LOGI("%f", correl);
-	//if( correl - bhattacharyya > thresh) return true;
-	if( correl > thresh ) return true;
-	else	return false;
-	/*
-	int *hist1 = new int[histsize];
-	int *hist2 = new int[histsize];
-
-	makehist( dst1, hist1, histsize, modelsize);
-	makehist( dst2, hist2, histsize, modelsize);
-	double t = cossim(hist1, hist2, histsize);
-	LOGI("%f", t);
-	if( t > thresh) return true;
-	else	return false;
-	*/
-
+	val.dif = val.dif/val.count;
 }
 extern "C"{
 JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv *env,jobject, jlong addrBgra ,jlong addrGray, jlong addrCanny, jintArray xpoint, jintArray ypoint){
@@ -598,9 +589,6 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_findfeature(JNIEnv 
 		//LOGI("%d, %d", crspt[i].x, crspt[i].y);
 	}
 
-
-
-
 	for( int i = 0; i < lines.size(); i++) {
 		temp.x = lines[i][0];
 		temp.y = lines[i][1];
@@ -641,12 +629,19 @@ JNIEXPORT void JNICALL Java_com_example_finalone1_NativeJava_warp(JNIEnv *env,jo
 	Point2f source_point[4];
 	Point2f dest_point[4];
 
-	for(int i = 0 ; i < 4 ; i++){
-		source_point[i].x = crspt[i].x;
-		source_point[i].y = crspt[i].y;
+	if( !track) {
+		for(int i = 0; i < 4; i++) {
+			source_point[i].x = crspt[i].x;
+			source_point[i].y = crspt[i].y;
+		}
+	}else{
+		for( int i = 0 ; i < 4 ; i++){
+			source_point[i].x = savecrspt[i].x;
+			source_point[i].y = savecrspt[i].y;
+		}
 	}
-	double len1 = distance(crspt[0].x, crspt[0].y, crspt[1].x, crspt[1].y);
-	double len2 = distance(crspt[1].x, crspt[1].y, crspt[2].x, crspt[2].y);
+	double len1 = distance(source_point[0].x, source_point[0].y, source_point[1].x, source_point[1].y);
+	double len2 = distance(source_point[1].x, source_point[1].y, source_point[2].x, source_point[2].y);
 
 
 	if( len1 > len2) { // len1 is long
@@ -694,7 +689,9 @@ JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env
 	vector<uchar> status;
 	vector<float> error;
 	cvtColor(mYuv, mBgra, CV_YUV420sp2BGR, 4);
+	Mat dst2;
 
+	track = mode;
 	if(firstset) {
 		if( mode) {
 			for( int i = 0; i < 4; i++) {
@@ -715,8 +712,10 @@ JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env
 					5
 			);
 			for( int i = 0; i < srcpt1.size(); i++) {
-//				LOGI("%d  :  %d ", i, status[i]);
 				Point p1, p2;
+
+				savecrspt[i].x = srcpt2[i].x;
+				savecrspt[i].y = srcpt2[i].y;
 				p1.x = (int) srcpt1[i].x;
 				p1.y = (int) srcpt1[i].y;
 				p2.x = (int) srcpt2[i].x;
@@ -733,22 +732,16 @@ JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env
 			}
 			if( monitor % 20  == 0){
 				monitor = 0;
-				if(monitoring_change(
+
+				monitoring_change(
 					first,
 					mGr,
 					srcpt1,
 					srcpt2,
-					300,
-					100,
-					0.9	)){
-					LOGI("ttttttttt");
-					monitorset= true;
-					// not change
-				}else{
-					LOGI("fffffffff");
-					monitorset = false;
-					// change
-				}
+					250,
+					20);
+				if( val.dif > 40) monitorset = false;
+				else monitorset = true;
 			}
 			monitor++;
 			if(!monitorset ) {
@@ -757,6 +750,24 @@ JNIEXPORT int JNICALL Java_com_example_finalone1_NativeJava_tracking(JNIEnv *env
 				temp.y = height/2;
 				circle(mBgra, temp, 2,Scalar(255,0,0,255),100);
 			}
+
+			stringstream sstm, sstm1,sstm2;
+			string text, text1, text2;
+			/*
+			sstm <<"bhatta : " << test1;
+			text = sstm.str();
+
+			sstm1 <<"correl : " << test2;
+			text1 = sstm1.str();
+			*/
+			sstm1 << "differ : " << val.dif;
+			text1 = sstm1.str();
+			sstm2 << "count : " << val.count;
+			text2 = sstm2.str();
+			putText(mBgra, text1, Point2f(50,100), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255), 2);
+			putText(mBgra, text2, Point2f(50,150), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255), 2);
+		//	putText(mBgra, text, Point2f(50,100), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255), 2);
+		//	putText(mBgra, text1, Point2f(50,150), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255), 2);
 //			LOGI("555555");
 //			first.release();
 //			first = mGr.clone();
